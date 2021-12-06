@@ -4,7 +4,7 @@ This API allows to list the 250 most expensive transfers that took place between
 
 This data API is created with Fastapi and the database is SQLAlchemy.
 
-Create database : use database.py or insert_database.sql
+Create database : use insert_database.sql (or database.py)
 
 API: main.py
 
