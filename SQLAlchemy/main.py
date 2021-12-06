@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 Base = declarative_base()
 
 #Create the database
-engine = create_engine('sqlite:///transfers.db')
+engine = create_engine('sqlite:///transfers.db', echo=True)
 Base.metadata.create_all(engine)
 
 #Create the session
