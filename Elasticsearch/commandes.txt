@@ -1,0 +1,91 @@
+# definir un pipeline avec le CSV processeur.
+curl -X PUT localhost:9200/_ingest/pipeline/pokemon_pipeline -H "Content-Type: application/json" -d '{
+    "processors": [
+    {
+      "csv" : {
+        "field" : "csv_line",
+        "target_fields": ["Name","Position","Age","Team_from","League_from","Team_to","League_to","Season","Market_value","Transfer_fee"]
+      }
+    }
+  ]
+}'
+
+# creer un index en lui specifiant notre pipeline
+curl -X PUT "localhost:9200/transfer" \
+-H "Content-Type: application/json" \
+-d '{
+    "settings": {
+        "index.default_pipeline": "transfer_pipeline"
+    },
+	"mappings": {
+        "properties": {
+            "Name":  { "type": "text"  }, 
+            "Position":   { "type": "text"  },
+            "Age":   { "type": "byte"  },
+            "Team_from":   { "type": "text"  },
+            "League_from":   { "type":   "text"  },
+            "Team_to":   { "type": "text"  }, 
+            "League_to":   { "type": "text"  }, 
+            "Season":   { "type": "keyword"  }, 
+            "Market_value":   { "type": "integer"  }, 
+            "Transfer_fee":   { "type": "integer"  }
+        }
+    }
+}'
+
+# creer un fichier insert.sh et l'executer
+
+"""
+------------------------------------
+    REQUESTS
+------------------------------------
+"""
+
+# renvoie tous les documents, leur donnant à tous un score de 1,0
+curl -X GET 'localhost:9200/transfer/_search' -H 'Content-Type: application/json' -d '
+{
+    "query":{
+        "match_all":{}
+    }
+}' | jq
+
+# rechercher les transfers pour la position "Right Winger"
+curl -X GET "localhost:9200/transfer/_search" -H 'Content-Type: application/json' -d '{
+    "query":{
+        "match":{
+            "Position":"Right Winger"
+        }
+    }
+}' | jq
+
+# rechercher les transfers compris entre 100000000 et 200000000 
+curl -XGET "localhost:9200/transfer/_search" -H 'Content-Type: application/json' -d '{
+    "query":{
+        "range":{
+            "Transfer_fee":{
+                "gte": 100000000,
+                "lte": 200000000}
+        }
+    }
+}' | jq
+
+# rechercher les transfers de ...
+curl -XGET "localhost:9200/transfer/_search" -H 'Content-Type: application/json' -d '{
+    "query": {
+    "bool" : {
+      "must" : {
+        "match":{"Position":"Right Winger"}
+      },
+	  "filter": {
+        "term":{"Season":"2017-2018"}
+      },
+      "must_not" : {
+        "range" : {
+          "age" : { "gte" : 25, "lte" : 30 }
+        }
+      }
+    }
+  }
+}' | jq
+
+
