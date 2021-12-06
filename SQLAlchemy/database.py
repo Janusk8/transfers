@@ -1,5 +1,5 @@
 from numpy import genfromtxt
-from sqlalchemy import Column, Integer, Float, Date
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,6 +8,8 @@ def Load_Data(file_name):
     data = genfromtxt(file_name, delimiter=';', skip_header=1, converters={0: lambda s: str(s)})
     return data.tolist()
 
+Base = declarative_base()
+
 class Player(Base):
     __tablename__ = "players"
 
@@ -15,9 +17,6 @@ class Player(Base):
     name = Column(String, unique=True, index=True)
     position = Column(String)
     age = Column(Integer)
-
-    transfer = relationship("Transfer", back_populates="player")
-
 
 class League(Base):
     __tablename__ = "leagues"
@@ -37,20 +36,16 @@ class Transfer(Base):
     __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_from_id = Column(Integer)
-    league_from_id = Column(Integer)
-    team_to_id = Column(Integer)
-    league_to_id = Column(Integer)
+    team_from_id = Column(Integer, ForeignKey("teams.id"))
+    league_from_id = Column(Integer, ForeignKey("leagues.id"))
+    team_to_id = Column(Integer, ForeignKey("teams.id"))
+    league_to_id = Column(Integer, ForeignKey("leagues.id"))
     season = Column(String)
     market_value = Column(Integer)
     transfer_fee = Column(Integer)
     player_id = Column(Integer, ForeignKey("players.id"))
 
-    player = relationship("Player", back_populates="transfers")
-
-
 if __name__ == "__main__":
-    t = time()
 
     #Create the database
     engine = create_engine('sqlite:///transfers.db')
@@ -116,4 +111,3 @@ if __name__ == "__main__":
         s.rollback() #Rollback the changes on error
     finally:
         s.close() #Close the connection
-    print "Time elapsed: " + str(time() - t) + " s." 
