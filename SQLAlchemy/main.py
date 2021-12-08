@@ -5,26 +5,18 @@ from fastapi import FastAPI, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy import Column, Integer, String, ForeignKey
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
 from sqlalchemy.orm import Session
-
-Base = declarative_base()
-
-#Create the database
-engine = create_engine('sqlite:///transfers.db', echo=True)
-Base.metadata.create_all(engine)
-
-#Create the session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 users = {
   "alice": "wonderland",
   "bob": "builder",
   "clementine": "mandarine"
 }
+
+Base = declarative_base()
 
 class Player(Base):
     __tablename__ = "players"
@@ -34,39 +26,43 @@ class Player(Base):
     position = Column(String)
     age = Column(Integer)
 
-    items = relationship("Transfer", back_populates="owner")
+class League(Base):
+    __tablename__ = "leagues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+    
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
 
 
 class Transfer(Base):
     __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer, ForeignKey("players.id"))
+    team_from_id = Column(Integer, ForeignKey("teams.id"))
+    league_from_id = Column(Integer, ForeignKey("leagues.id"))
+    team_to_id = Column(Integer, ForeignKey("teams.id"))
+    league_to_id = Column(Integer, ForeignKey("leagues.id"))
+    season = Column(String)
     market_value = Column(Integer)
     transfer_fee = Column(Integer)
+    player_id = Column(Integer, ForeignKey("players.id"))
 
-    owner = relationship("Player", back_populates="transfers")
+#Create the database
+engine = create_engine('sqlite:///transfers.db', echo=True)
+conn = engine.connect()
 
-class Transfer(BaseModel):
-    id: int
-    player_id: int
-    team_from_id: int
-    league_from_id: int
-    team_to_id: int
-    league_to_id: int
-    season: str
-    market_value: int
-    transfer_fee: int
+# Test
+# stmt = text ( "SELECT * from transfers inner join players on players.id=transfers.player_id limit 5;" )
+# result = conn.execute(stmt)
+# print(result.fetchall())
 
-
-class Player(BaseModel):
-    id: int
-    name: str
-    age: int
-    position: str
-    transfers: List[Transfer] = []
-
-
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 api = FastAPI()
 
@@ -103,26 +99,38 @@ def get_admin_username(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 def get_player(db: Session, player_id: int):
-    return db.query(Player).filter(models.Player.id == player_id).first()
-
-
-def get_player_by_name(db: Session, name: str):
-    return db.query(Player).filter(models.Player.name == name).first()
-
+    return db.query(Player).filter(Player.id == player_id).first()
 
 def get_players(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Player).offset(skip).limit(limit).all()
 
+def get_teams(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(Team).offset(skip).limit(limit).all()
+
+def get_leagues(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(League).offset(skip).limit(limit).all()
 
 def get_transfers(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Transfer).offset(skip).limit(limit).all()
 
+def get_transfers_for_player(db: Session, player_id: int):
+    return db.query(Transfer).filter(Transfer.player_id == player_id).all()
+
+
+@api.get("/teams/")
+def read_teams(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    teams = get_teams(db, skip=skip, limit=limit)
+    return teams
+
+@api.get("/leagues/")
+def read_leagues(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    leagues = get_leagues(db, skip=skip, limit=limit)
+    return leagues
 
 @api.get("/players/")
 def read_players(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     players = get_players(db, skip=skip, limit=limit)
     return players
-
 
 @api.get("/players/{player_id}")
 def read_player(player_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
@@ -131,8 +139,14 @@ def read_player(player_id: int, db: Session = Depends(get_db), username: str = D
         raise HTTPException(status_code=404, detail="Player not found")
     return db_player
 
-
 @api.get("/transfers/")
 def read_transfers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     transfers = get_transfers(db, skip=skip, limit=limit)
     return transfers
+
+@api.get("/players/{player_id}/transfers/")
+def read_transfers_for_player(player_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    transfers  = get_transfers_for_player(db, player_id=player_id)
+    if transfers  is None:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+    return transfers 
