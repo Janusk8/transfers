@@ -9,10 +9,9 @@ Create database : use insert_database.sql (or database.py)
 API: main.py
 
 Endpoints:
-
+/teams/
+/leagues/
 /players/
-
 /players/{player_id}
-
 /transfers/
-
+/players/{player_id}/transfers/
